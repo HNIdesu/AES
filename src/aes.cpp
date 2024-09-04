@@ -1,6 +1,6 @@
-#include "aes.h"
+#include <aes.h>
 #include <cstring>
-#include "stdexcept"
+#include <stdexcept>
 
 static const uint8_t s_box[256]={
     0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
@@ -21,6 +21,25 @@ static const uint8_t s_box[256]={
     0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16
 };
 
+static const uint8_t inv_s_box[256]={
+    0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38, 0xbf, 0x40, 0xa3, 0x9e, 0x81, 0xf3, 0xd7, 0xfb,
+    0x7c, 0xe3, 0x39, 0x82, 0x9b, 0x2f, 0xff, 0x87, 0x34, 0x8e, 0x43, 0x44, 0xc4, 0xde, 0xe9, 0xcb,
+    0x54, 0x7b, 0x94, 0x32, 0xa6, 0xc2, 0x23, 0x3d, 0xee, 0x4c, 0x95, 0x0b, 0x42, 0xfa, 0xc3, 0x4e,
+    0x08, 0x2e, 0xa1, 0x66, 0x28, 0xd9, 0x24, 0xb2, 0x76, 0x5b, 0xa2, 0x49, 0x6d, 0x8b, 0xd1, 0x25,
+    0x72, 0xf8, 0xf6, 0x64, 0x86, 0x68, 0x98, 0x16, 0xd4, 0xa4, 0x5c, 0xcc, 0x5d, 0x65, 0xb6, 0x92,
+    0x6c, 0x70, 0x48, 0x50, 0xfd, 0xed, 0xb9, 0xda, 0x5e, 0x15, 0x46, 0x57, 0xa7, 0x8d, 0x9d, 0x84,
+    0x90, 0xd8, 0xab, 0x00, 0x8c, 0xbc, 0xd3, 0x0a, 0xf7, 0xe4, 0x58, 0x05, 0xb8, 0xb3, 0x45, 0x06,
+    0xd0, 0x2c, 0x1e, 0x8f, 0xca, 0x3f, 0x0f, 0x02, 0xc1, 0xaf, 0xbd, 0x03, 0x01, 0x13, 0x8a, 0x6b,
+    0x3a, 0x91, 0x11, 0x41, 0x4f, 0x67, 0xdc, 0xea, 0x97, 0xf2, 0xcf, 0xce, 0xf0, 0xb4, 0xe6, 0x73,
+    0x96, 0xac, 0x74, 0x22, 0xe7, 0xad, 0x35, 0x85, 0xe2, 0xf9, 0x37, 0xe8, 0x1c, 0x75, 0xdf, 0x6e,
+    0x47, 0xf1, 0x1a, 0x71, 0x1d, 0x29, 0xc5, 0x89, 0x6f, 0xb7, 0x62, 0x0e, 0xaa, 0x18, 0xbe, 0x1b,
+    0xfc, 0x56, 0x3e, 0x4b, 0xc6, 0xd2, 0x79, 0x20, 0x9a, 0xdb, 0xc0, 0xfe, 0x78, 0xcd, 0x5a, 0xf4,
+    0x1f, 0xdd, 0xa8, 0x33, 0x88, 0x07, 0xc7, 0x31, 0xb1, 0x12, 0x10, 0x59, 0x27, 0x80, 0xec, 0x5f,
+    0x60, 0x51, 0x7f, 0xa9, 0x19, 0xb5, 0x4a, 0x0d, 0x2d, 0xe5, 0x7a, 0x9f, 0x93, 0xc9, 0x9c, 0xef,
+    0xa0, 0xe0, 0x3b, 0x4d, 0xae, 0x2a, 0xf5, 0xb0, 0xc8, 0xeb, 0xbb, 0x3c, 0x83, 0x53, 0x99, 0x61,
+    0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26, 0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0C, 0x7d
+};
+
 static const uint8_t Rcon[10] = {
     0x01, 0x02, 0x04, 0x08, 0x10, 
     0x20, 0x40, 0x80, 0x1B, 0x36
@@ -31,6 +50,13 @@ static const uint8_t M[16] = {
     3,2,1,1,
     1,3,2,1,
     1,1,3,2
+};
+
+static const uint8_t N[16] = {
+    0xE,0x9,0xD,0xB,
+    0xB,0xE,0x9,0xD,
+    0xD,0xB,0xE,0x9,
+    0x9,0xD,0xB,0xE
 };
 
 uint32_t AES::get_keysize() const{
@@ -56,31 +82,16 @@ static uint8_t gf_mult(uint8_t a, uint8_t b) {
     return result;
 }
 
-static void sub_bytes(uint8_t* state){
-    for (uint32_t i = 0; i < 16; i++)
-        state[i] = s_box[state[i]];
-}
-
-static void add_round_key(uint8_t* state,const uint8_t* round_key) {
-    for (uint32_t i = 0; i < 16; i++)
-        state[i] ^= round_key[i];
-}
-
 static uint32_t rotate_right(uint32_t value, uint32_t shift) {
     while (shift--)
         value = (value >> 8) | ((value & 0xFF) << 24);
     return value;
 }
 
-static void shift_rows(uint8_t* state) {
-    for (uint32_t j = 0; j < 4; j++) {
-        uint32_t num = state[j] | (state[4 + j]<< 8) | (state[8 + j] << 16) | (state[12 + j] << 24);
-        num = rotate_right(num, j);
-        state[j] = num & 0xFF;
-        state[4 + j] = (num >> 8) & 0xFF;
-        state[8 + j] = (num >> 16) & 0xFF;
-        state[12 + j] = num >> 24;
-    }
+static uint32_t rotate_left(uint32_t value, uint32_t shift) {
+    while (shift--)
+        value = (value << 8) | ((value & 0xFF000000)>>24);
+    return value;
 }
 
 static void matrix_mul(uint8_t* m,const uint8_t* m1,const uint8_t* m2) {
@@ -94,9 +105,30 @@ static void matrix_mul(uint8_t* m,const uint8_t* m1,const uint8_t* m2) {
     }
 }
 
-static void mix_columns(uint8_t* state) {
+static void sub_bytes(uint8_t* state,const uint8_t* box){
+    for (uint32_t i = 0; i < 16; i++)
+        state[i] = box[state[i]];
+}
+
+static void add_round_key(uint8_t* state,const uint8_t* round_key) {
+    for (uint32_t i = 0; i < 16; i++)
+        state[i] ^= round_key[i];
+}
+
+static void shift_rows(uint8_t* state,uint32_t(*func)(uint32_t,uint32_t)) {
+    for (uint32_t j = 0; j < 4; j++) {
+        uint32_t num = state[j] | (state[4 + j]<< 8) | (state[8 + j] << 16) | (state[12 + j] << 24);
+        num = func(num, j);
+        state[j] = num & 0xFF;
+        state[4 + j] = (num >> 8) & 0xFF;
+        state[8 + j] = (num >> 16) & 0xFF;
+        state[12 + j] = num >> 24;
+    }
+}
+
+static void mix_columns(uint8_t* state,const uint8_t* mat) {
     uint8_t temp[16];
-    matrix_mul(temp,state, M);
+    matrix_mul(temp,state, mat);
     memcpy(state, temp, 16);
 }
 
@@ -105,12 +137,26 @@ static void encrypt_block(const uint8_t* data,uint8_t* buffer,const uint8_t* rou
     memcpy(state, data, 16);
     add_round_key(state, round_key);
     for (uint32_t i = 1; i <= 10; i++) {
-        sub_bytes(state);
-        shift_rows(state);
+        sub_bytes(state,s_box);
+        shift_rows(state,rotate_right);
         if(i!=10)
-            mix_columns(state);
+            mix_columns(state,M);
         add_round_key(state, round_key + i * 16);
     }
+    memcpy(buffer, state, 16);
+}
+
+static void decrypt_block(const uint8_t* data, uint8_t* buffer, const uint8_t* round_key) {
+    uint8_t state[16];
+    memcpy(state, data, 16);
+    for (uint32_t i = 10; i >= 1; i--) {
+        add_round_key(state, round_key + i * 16);
+        if (i != 10)
+            mix_columns(state,N);
+        shift_rows(state,rotate_left);
+        sub_bytes(state,inv_s_box);
+    }
+    add_round_key(state, round_key);
     memcpy(buffer, state, 16);
 }
 
@@ -121,6 +167,15 @@ void AES::encrypt_ecb(const uint8_t* data, uint32_t data_length, uint8_t* buffer
     auto round_key = this->_round_key;
     for (uint32_t i = 0; i < data_length; i += 16)
         encrypt_block(data, buffer + i, round_key);
+}
+
+void AES::decrypt_ecb(const uint8_t* data, uint32_t data_length, uint8_t* buffer) const
+{
+    if (data_length % 16 != 0)
+        throw std::exception("The data length must be a multiple of 16.");
+    auto round_key = this->_round_key;
+    for (uint32_t i = 0; i < data_length; i += 16)
+        decrypt_block(data, buffer + i, round_key);
 }
 
 void AES::encrypt_cbc(const uint8_t* data, uint32_t data_length, const uint8_t* iv, uint8_t* buffer) const
@@ -136,7 +191,21 @@ void AES::encrypt_cbc(const uint8_t* data, uint32_t data_length, const uint8_t* 
         encrypt_block(_iv, buffer + i, round_key);
         memcpy(_iv, buffer + i, 16);
     }
-        
+}
+
+void AES::decrypt_cbc(const uint8_t* data, uint32_t data_length, const uint8_t* iv, uint8_t* buffer) const
+{
+    if (data_length % 16 != 0)
+        throw std::exception("The data length must be a multiple of 16.");
+    uint8_t _iv[16];
+    memcpy(_iv, iv, 16);
+    auto round_key = this->_round_key;
+    for (uint32_t i = 0; i < data_length; i += 16) {
+        decrypt_block(data + i, buffer + i, round_key);
+        for (uint32_t j = 0; j < 16; j++)
+           buffer[i+j] ^= _iv[j];
+        memcpy(_iv, data + i, 16);
+    }
 }
 
 static void generate_round_key(uint8_t* round_key,uint32_t round){
@@ -163,14 +232,14 @@ AES::AES(const char* key,uint32_t key_size)
         break;
     case 24:
         this->_key_size=192;
-        throw std::exception("Not supported");
+        throw std::exception("Not supported.");
     case 32:
         this->_key_size=256;
-        throw std::exception("Not supported");
+        throw std::exception("Not supported.");
     default:
         throw std::exception("Key length must be 16,24 or 32.");
     }
-    auto round_key=new uint8_t[key_size*round];
+    auto round_key=new uint8_t[key_size * round];
     memcpy(round_key,key,key_size);
     generate_round_key(round_key,round);
     this->_round_key=round_key;

@@ -10,6 +10,8 @@ public:
     const uint8_t* get_round_key() const;
     void encrypt_cbc(const uint8_t* data,uint32_t data_length,const uint8_t* iv,uint8_t* buffer) const;
     void encrypt_ecb(const uint8_t* data,uint32_t data_length,uint8_t* buffer) const;
+    void decrypt_cbc(const uint8_t* data,uint32_t data_length,const uint8_t* iv,uint8_t* buffer) const;
+    void decrypt_ecb(const uint8_t* data,uint32_t data_length,uint8_t* buffer) const;
 private:
     const uint8_t* _round_key;
     uint32_t _key_size;
